@@ -1,0 +1,22 @@
+<idea-plugin>
+    <id>me.mrnavastar.Lyra</id>
+    <name>Lyra</name>
+    <vendor email="mr.navastar@gmail.com" url="https://github.com/MrNavaStar">MrNavaStar</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description><![CDATA[A go inspired build system for java ... written in go!]]></description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <postStartupActivity implementation="me.mrnavastar.lyra.Lyra"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener class="me.mrnavastar.lyra.Lyra" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+    </applicationListeners>
+</idea-plugin>

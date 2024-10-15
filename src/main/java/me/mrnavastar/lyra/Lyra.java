@@ -28,9 +28,7 @@ public class Lyra implements ProjectActivity, BulkFileListener {
 
     @Override
     public @Nullable Object execute(@NotNull Project p, @NotNull Continuation<? super Unit> continuation) {
-        System.out.println("hello!");
-
-        /*try {
+        try {
             LyraProject project = ReadAction.compute(() -> {
                 Optional<VirtualFile> vfile = FilenameIndex.getVirtualFilesByName(LYRA, GlobalSearchScope.allScope(p)).stream().findFirst();
                 return vfile.isPresent() ? LyraProject.fromInputStream(vfile.get().getInputStream()) : null;
@@ -40,7 +38,7 @@ public class Lyra implements ProjectActivity, BulkFileListener {
 
         } catch (IOException e) {
             throw new RuntimeException(e);
-        }*/
+        }
         return null;
     }
 

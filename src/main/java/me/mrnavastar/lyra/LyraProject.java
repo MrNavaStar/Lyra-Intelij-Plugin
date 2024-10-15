@@ -1,8 +1,9 @@
 package me.mrnavastar.lyra;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
-import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.*;
 import com.intellij.openapi.roots.libraries.Library;
@@ -43,45 +44,44 @@ public class LyraProject {
     }
 
     public void sync(Project project) {
-        ProgressManager.getInstance().runProcessWithProgressSynchronously(
-                () -> {
-                    Module[] modules = ModuleManager.getInstance(project).getModules();
-                    ModifiableRootModel modifiableRootModel = ModuleRootManager.getInstance(modules[0]).getModifiableModel();
-                    LibraryTable.ModifiableModel libraryTableModel = LibraryTablesRegistrar.getInstance().getLibraryTable(project).getModifiableModel();
+        ApplicationManager.getApplication().invokeLater(() -> {
+            Module[] modules = ModuleManager.getInstance(project).getModules();
+            ModifiableRootModel modifiableRootModel = ModuleRootManager.getInstance(modules[0]).getModifiableModel();
+            LibraryTable.ModifiableModel libraryTableModel = LibraryTablesRegistrar.getInstance().getLibraryTable(project).getModifiableModel();
 
-                    // Link missing libraries
-                    for (Artifact lib : Libraries) {
-                        if (Arrays.stream(libraryTableModel.getLibraries()).anyMatch(l -> Objects.equals(l.getName(), lib.Coordinate))) continue;
+            // Link missing libraries
+            for (Artifact lib : Libraries) {
+                if (Arrays.stream(libraryTableModel.getLibraries()).anyMatch(l -> Objects.equals(l.getName(), lib.Coordinate))) continue;
 
-                        Library library = libraryTableModel.createLibrary(lib.Coordinate);
-                        Library.ModifiableModel libraryModel = library.getModifiableModel();
-                        libraryModel.addRoot(getArtifactPath(lib), OrderRootType.CLASSES);
-                        libraryModel.commit();
+                Library library = libraryTableModel.createLibrary(lib.Coordinate);
+                Library.ModifiableModel libraryModel = library.getModifiableModel();
+                libraryModel.addRoot(getArtifactPath(lib), OrderRootType.CLASSES);
+                libraryModel.commit();
 
-                        LibraryOrderEntry libraryOrderEntry = modifiableRootModel.addLibraryEntry(library);
-                        libraryOrderEntry.setScope(DependencyScope.COMPILE);
-                    }
+                LibraryOrderEntry libraryOrderEntry = modifiableRootModel.addLibraryEntry(library);
+                libraryOrderEntry.setScope(DependencyScope.COMPILE);
+            }
 
-                    // Unlink unneeded Libraries
-                    Arrays.stream(libraryTableModel.getLibraries())
-                            .filter(l -> Libraries.stream().noneMatch(ll -> ll.Coordinate.equals(l.getName())))
-                            .forEach(l -> {
-                                LibraryOrderEntry entry = null;
-                                for (OrderEntry orderEntry : modifiableRootModel.getOrderEntries()) {
-                                    if (orderEntry instanceof LibraryOrderEntry libraryOrderEntry && Objects.equals(libraryOrderEntry.getLibrary(), l)) {
-                                        entry = libraryOrderEntry;
-                                    }
-                                }
-                                if (entry == null) return;
+            // Unlink unneeded Libraries
+            Arrays.stream(libraryTableModel.getLibraries())
+                    .filter(l -> Libraries.stream().noneMatch(ll -> ll.Coordinate.equals(l.getName())))
+                    .forEach(l -> {
+                        LibraryOrderEntry entry = null;
+                        for (OrderEntry orderEntry : modifiableRootModel.getOrderEntries()) {
+                            if (orderEntry instanceof LibraryOrderEntry libraryOrderEntry && Objects.equals(libraryOrderEntry.getLibrary(), l)) {
+                                entry = libraryOrderEntry;
+                            }
+                        }
+                        if (entry == null) return;
 
-                                modifiableRootModel.removeOrderEntry(entry);
-                                libraryTableModel.removeLibrary(l);
-                            });
+                        modifiableRootModel.removeOrderEntry(entry);
+                        libraryTableModel.removeLibrary(l);
+                    });
 
-                    modifiableRootModel.commit();
-                    libraryTableModel.commit();
-                },
-                "Lyra - Synchronizing Project", false, project
-        );
+            WriteAction.run(() -> {
+                modifiableRootModel.commit();
+                libraryTableModel.commit();
+            });
+        });
     }
 }

@@ -1,66 +1,50 @@
 package me.mrnavastar.lyra;
 
-import com.google.gson.Gson;
-import com.intellij.openapi.application.ReadAction;
-import com.intellij.openapi.application.WriteAction;
+import com.intellij.execution.ExecutionException;
+import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.execution.util.ExecUtil;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.ProjectManager;
-import com.intellij.openapi.roots.*;
-import com.intellij.openapi.startup.ProjectActivity;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.newvfs.BulkFileListener;
-import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
-import com.intellij.psi.search.FilenameIndex;
-import com.intellij.psi.search.GlobalSearchScope;
-import kotlin.Unit;
-import kotlin.coroutines.Continuation;
+import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.vfs.VfsUtil;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
-public class Lyra implements ProjectActivity, BulkFileListener {
+public class Lyra {
 
-    public static final Gson GSON = new Gson();
-    private final String LYRA = "lyra.json";
-
-    @Override
-    public @Nullable Object execute(@NotNull Project p, @NotNull Continuation<? super Unit> continuation) {
-        try {
-            LyraProject project = ReadAction.compute(() -> {
-                Optional<VirtualFile> vfile = FilenameIndex.getVirtualFilesByName(LYRA, GlobalSearchScope.allScope(p)).stream().findFirst();
-                return vfile.isPresent() ? LyraProject.fromInputStream(vfile.get().getInputStream()) : null;
-            });
-
-            if (project != null && project.isValid()) project.sync(p);
-
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return null;
+    private static String parsePath(String path) {
+        String url = VfsUtil.pathToUrl(FileUtil.toSystemIndependentName(path));
+        return url.replaceAll("file:", "jar:") + "!/";
     }
 
-    @Override
-    public void after(@NotNull List<? extends @NotNull VFileEvent> events) {
-        for (VFileEvent event : events) {
-            VirtualFile file = event.getFile();
-            if (file == null || !file.getPath().endsWith(LYRA)) continue;
+    public static CompletableFuture<List<String>> getProjectClasspath(Project project, Path projectRoot) {
+        CompletableFuture<List<String>> future = new CompletableFuture<>();
 
-            for (Project project : ProjectManager.getInstance().getOpenProjects()) {
-                if (project.isDisposed()
-                        || !ProjectRootManager.getInstance(project).getFileIndex().isInContent(file)
-                        && !ProjectRootManager.getInstance(project).getFileIndex().isInProject(file)) continue;
+        GeneralCommandLine cmd = new GeneralCommandLine("lyra", "classpath")
+                .withCharset(StandardCharsets.UTF_8)
+                .withWorkDirectory(projectRoot.toFile());
 
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Lyra : syncing dependencies") {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                indicator.setIndeterminate(true);
                 try {
-                    LyraProject meta = LyraProject.fromInputStream(file.getInputStream());
-                    if (!meta.isValid()) return;
-                    meta.sync(project);
-                } catch (IOException e) {
-                    e.printStackTrace();
+                    List<String> lines = ExecUtil.execAndGetOutput(cmd).getStdoutLines();
+                    ArrayList<String> classpath = new ArrayList<>();
+                    for (String s : lines.get(lines.size() -1).split(";")) classpath.add(parsePath(s));
+                    future.complete(classpath);
+                } catch (ExecutionException e) {
+                    throw new RuntimeException(e);
                 }
             }
-        }
+        });
+        return future;
     }
 }

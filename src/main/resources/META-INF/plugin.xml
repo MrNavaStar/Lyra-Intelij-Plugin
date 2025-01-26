@@ -12,11 +12,7 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
 
-    <extensions defaultExtensionNs="com.intellij">
-        <postStartupActivity implementation="me.mrnavastar.lyra.Lyra"/>
-    </extensions>
-
     <applicationListeners>
-        <listener class="me.mrnavastar.lyra.Lyra" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+        <listener class="me.mrnavastar.lyra.Plugin" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
     </applicationListeners>
 </idea-plugin>
